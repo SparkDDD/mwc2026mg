@@ -1,81 +1,99 @@
 import os
 import time
 import random
-import requests
+import json
+import gspread
 from playwright.sync_api import sync_playwright
+from oauth2client.service_account import ServiceAccountCredentials
 
-# 환경 변수 설정
-EMAIL = os.getenv("MWC_EMAIL", "").strip()
-PASSWORD = os.getenv("MWC_PASSWORD", "").strip()
-MAKE_REPORT_URL = os.getenv("MAKE_REPORT_URL", "").strip()
-TARGET_IDS_RAW = os.getenv("TARGET_IDS", "")
-CUSTOM_MESSAGE = os.getenv("CUSTOM_MSG", "")
+# 1. 환경 변수 로드 (GitHub Secrets)
+EMAIL = os.getenv("MWC_EMAIL")
+PASSWORD = os.getenv("MWC_PASSWORD")
+SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
+CREDS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 
-def report_status(uid, status, log=""):
-    """결과를 Make.com Webhook으로 전송"""
-    if not MAKE_REPORT_URL: return
-    try:
-        # 이 신호가 Make.com의 새로운 시나리오를 깨웁니다.
-        requests.post(MAKE_REPORT_URL, json={
-            "uuid": uid, 
-            "status": status, 
-            "log": log
-        }, timeout=10)
-    except:
-        pass
+def get_sheet():
+    """구글 시트 API 연결 및 시트 오픈"""
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds_dict = json.loads(CREDS_JSON)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+    return client.open_by_key(SHEET_ID).sheet1
 
 def main():
-    # ID 리스트 정리
-    targets = [uid.strip() for uid in TARGET_IDS_RAW.split(",") if uid.strip()]
+    sheet = get_sheet()
+    # 전체 데이터를 가져와서 헤더(1행) 제외하고 분석
+    records = sheet.get_all_records()
+    
+    # 발송 대상 필터링 (Status가 'Pending'이거나 비어있는 경우)
+    targets = []
+    for i, row in enumerate(records, start=2): # 2행부터 시작
+        status = str(row.get('Status', '')).strip()
+        if status == 'Pending' or status == '':
+            targets.append({
+                'row': i,
+                'uuid': row.get('UUID'),
+                'name': row.get('Name')
+            })
+
+    if not targets:
+        print("[System] 발송 대상을 찾지 못했습니다. (Status='Pending' 없음)")
+        return
+
+    print(f"[System] 총 {len(targets)}명의 발송 대상을 찾았습니다.")
 
     with sync_playwright() as p:
-        # 가벼운 크로미움 실행
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
         page = context.new_page()
 
-        # [Login] 단계
+        # [Login]
         print(f"[Login] 페이지 접속 중: {EMAIL}")
         page.goto("https://www.mwcbarcelona.com/mymwc", wait_until="networkidle")
-
         try:
             if page.locator("#onetrust-accept-btn-handler").is_visible():
                 page.click("#onetrust-accept-btn-handler")
-                print("[Login] 쿠키 승인 완료")
         except: pass
 
         page.fill("input[type='email']", EMAIL)
         page.fill("input[type='password']", PASSWORD)
         page.click("button:has-text('Log in')")
-        
-        # 로그인 안정화를 위한 대기
-        time.sleep(5) 
-        print("[Login] 로그인 시도 완료. 대시보드 로딩 대기...")
+        time.sleep(5)
+        print("[Login] 로그인 시도 완료")
 
-        # [Messaging] 단계
-        print(f"\n[Messaging] 총 {len(targets)}명에게 전송 시작")
-
-        for uid in targets:
-            print(f"\n[Target] {uid} 이동 중...")
-            page.goto(f"https://www.mwcbarcelona.com/mymwc/messaging?conversation={uid}", wait_until="domcontentloaded")
+        for item in targets:
+            uid = item['uuid']
+            row_idx = item['row']
+            name = item['name']
+            
+            print(f"\n[Target] {name} ({uid}) 전송 중... (Sheet {row_idx}행)")
             
             try:
-                # 입력창 대기 및 입력
+                # 메시지 전송 페이지 이동
+                page.goto(f"https://www.mwcbarcelona.com/mymwc/messaging?conversation={uid}", wait_until="domcontentloaded")
+                
+                # 메시지 입력 및 전송 (메시지 내용은 시트에 고정된 값을 쓰거나 코드에 정의)
                 input_sel = "input[placeholder='Type a message...']"
                 page.wait_for_selector(input_sel, timeout=15000)
-                page.fill(input_sel, CUSTOM_MESSAGE)
+                
+                msg = f"Hi {name}! Nice to meet you." # 메시지 커스텀 가능
+                page.fill(input_sel, msg)
                 page.keyboard.press("Enter")
                 
-                print(f"[Success] {uid} 전송 완료")
-                report_status(uid, "Success")
+                # 시트 업데이트 (C: Status, D: Timestamp, E: Log)
+                now = time.strftime('%Y-%m-%d %H:%M:%S')
+                sheet.update(range_name=f"C{row_idx}:E{row_idx}", values=[["Success", now, "Sent Successfully"]])
+                
+                print(f"[Success] {uid} 전송 및 시트 업데이트 완료")
+                
             except Exception as e:
-                error_snippet = str(e)[:30]
-                print(f"[Fail] {uid}: {error_snippet}")
-                report_status(uid, "Fail", error_snippet)
+                error_msg = str(e)[:50]
+                print(f"[Fail] {uid}: {error_msg}")
+                sheet.update(range_name=f"C{row_idx}:E{row_idx}", values=[["Fail", time.strftime('%Y-%m-%d %H:%M:%S'), error_msg]])
 
             # 스팸 방지 랜덤 대기
             wait_time = round(random.uniform(20, 35), 1)
-            print(f"[Wait] 스팸 차단 방지 대기 ({wait_time}초)...")
+            print(f"[Wait] 다음 발송까지 대기 ({wait_time}초)...")
             time.sleep(wait_time)
 
         browser.close()
