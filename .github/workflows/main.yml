@@ -29,12 +29,3 @@ jobs:
           TARGET_IDS: ${{ github.event.client_payload.ids }}
           CUSTOM_MSG: ${{ github.event.client_payload.message }}
         run: python main.py
-
-      # ⭐ 이 부분이 핵심입니다: 스크린샷 파일을 GitHub에 저장합니다.
-      - name: Upload Screenshots
-        if: always() # 성공/실패 여부와 관계없이 항상 업로드
-        uses: actions/upload-artifact@v4
-        with:
-          name: mwc-screenshots
-          path: screenshots/
-          retention-days: 7 # 7일 동안 보관
