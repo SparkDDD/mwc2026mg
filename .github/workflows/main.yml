@@ -1,0 +1,33 @@
+name: MWC Messaging Task
+
+on:
+  repository_dispatch:
+    types: [start-messaging]
+
+jobs:
+  run-messenger:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install playwright requests
+          playwright install --with-deps chromium
+
+      - name: Run Python Script
+        env:
+          MWC_EMAIL: ${{ secrets.MWC_EMAIL }}
+          MWC_PASSWORD: ${{ secrets.MWC_PASSWORD }}
+          MAKE_REPORT_URL: ${{ secrets.MAKE_REPORT_URL }}
+          TARGET_IDS: ${{ github.event.client_payload.ids }}
+          CUSTOM_MSG: ${{ github.event.client_payload.message }}
+        run: python main.py
