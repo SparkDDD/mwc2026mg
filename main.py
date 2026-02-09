@@ -76,12 +76,15 @@ def main():
                 input_sel = "input[placeholder='Type a message...']"
                 page.wait_for_selector(input_sel, timeout=20000)
                 
-                # [핵심] 일반 fill 대신 자바스크립트로 값을 직접 주입하여 줄바꿈 보존
-                page.evaluate(f"""(selector, text) => {{
+# [수정된 부분] 인수를 명확하게 분리하여 전달합니다.
+                page.evaluate("""([selector, text]) => {
                     const input = document.querySelector(selector);
-                    input.value = text;
-                    input.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                }}""", input_sel, final_msg)
+                    if (input) {
+                        input.value = text;
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }""", [input_sel, final_msg]) # 인수를 리스트로 묶어서 전달
                 
                 time.sleep(1) # 입력 안정화
                 page.keyboard.press("Enter")
