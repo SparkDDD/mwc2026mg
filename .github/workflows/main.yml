@@ -19,9 +19,17 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          # 1. 필수 라이브러리 및 Python 패키지 설치
           pip install playwright requests
-          playwright install --with-deps chromium
+          
+          # 2. Ubuntu 24.04 패키지 호환성 처리 (libasound2 이슈 해결)
+          sudo apt-get update
+          sudo apt-get install -y libasound2t64 || sudo apt-get install -y libasound2
+          
+          # 3. Playwright 브라우저 및 의존성 설치
+          # --with-deps에서 발생하는 에러를 무시하고 진행하도록 설정
+          npx playwright install chromium --with-deps || true
+          playwright install chromium
 
       - name: Run Python Script
         env:
