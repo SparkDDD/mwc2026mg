@@ -12,7 +12,7 @@ PASSWORD = os.getenv("MWC_PASSWORD")
 SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
 CREDS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 # Softr에서 넘어온 메시지 (양끝 공백 제거)
-RAW_MESSAGE = os.getenv("CUSTOM_MSG", "").strip()
+RAW_MESSAGE = os.getenv("CUSTOM_MSG", "").replace("\\n", "\n").strip()
 
 def get_sheet():
     """구글 시트 API 연결"""
