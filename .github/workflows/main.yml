@@ -1,4 +1,4 @@
-name: MWC Messaging Workflow 0509
+name: MWC Messaging Workflow 0547
 
 on:
   repository_dispatch:
