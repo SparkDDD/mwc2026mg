@@ -12,14 +12,17 @@ TARGET_IDS_RAW = os.getenv("TARGET_IDS", "")
 CUSTOM_MESSAGE = os.getenv("CUSTOM_MSG", "")
 
 def report_status(uid, status, log=""):
-    """결과를 다시 Make.com으로 보내 시트 업데이트"""
+    """결과를 Make.com Webhook으로 전송"""
     if not MAKE_REPORT_URL: return
     try:
+        # 이 신호가 Make.com의 새로운 시나리오를 깨웁니다.
         requests.post(MAKE_REPORT_URL, json={
-            "uuid": uid, "status": status, "log": log,
-            "timestamp": time.strftime('%Y-%m-%d %H:%M:%S')
+            "uuid": uid, 
+            "status": status, 
+            "log": log
         }, timeout=10)
-    except: pass
+    except:
+        pass
 
 def main():
     # ID 리스트 정리
