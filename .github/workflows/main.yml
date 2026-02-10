@@ -1,4 +1,4 @@
-name: MWC Messaging Workflow 0547
+name: MWC Messaging Workflow
 
 on:
   repository_dispatch:
@@ -29,3 +29,12 @@ jobs:
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
           CUSTOM_MSG: ${{ github.event.client_payload.custom_message }}
         run: python main.py
+
+      # 실행이 끝난 후 로그 파일을 아카이브로 업로드
+      - name: Upload Execution Log
+        if: always() # 성공/실패 여부와 상관없이 항상 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: mwc-messaging-log
+          path: execution_log.txt
+          retention-days: 7 # 7일 동안 보관
