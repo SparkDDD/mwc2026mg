@@ -52,7 +52,7 @@ def main():
         page = context.new_page()
 
         # 로그인
-        page.goto("https://www.mwcbarcelona.com/mymwc", wait_until="networkidle")
+        page.goto("https://www.mwcbarcelona.com/mymwc", wait_until="domcontentloaded", timeout=60000)
         try:
             if page.locator("#onetrust-accept-btn-handler").is_visible():
                 page.click("#onetrust-accept-btn-handler", timeout=5000)
@@ -74,7 +74,7 @@ def main():
                 
                 # 입력창 대기
                 input_sel = "input[placeholder='Type a message...']"
-                page.wait_for_selector(input_sel, timeout=20000)
+                page.wait_for_selector(input_sel, timeout=30000)
                 
 # [수정된 부분] 인수를 명확하게 분리하여 전달합니다.
                 page.evaluate("""([selector, text]) => {
