@@ -85,7 +85,7 @@ def main():
         for item in targets:
             uid, row_idx, name = item['uuid'], item['row'], item['name']
             # 이름만 붙인 심플한 메시지 조합
-            final_msg = f"Hi {name}! {RAW_MESSAGE}" if RAW_MESSAGE else f"Hi {name}!"
+            final_msg = f"Hello {name}! {RAW_MESSAGE}" if RAW_MESSAGE else f"Hello {name}!"
             
             print(f"\n[Target] {name} 작업 중...")
             
