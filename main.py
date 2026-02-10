@@ -58,12 +58,29 @@ def main():
         context = browser.new_context(user_agent="Mozilla/5.0...")
         page = context.new_page()
 
-        # 로그인
+# [수정] 로그인 전 배너 처리 강화
         page.goto("https://www.mwcbarcelona.com/mymwc", wait_until="networkidle")
+        time.sleep(3) # 배너가 뜰 시간을 조금 더 줌
+
+        try:
+            # 쿠키 승인 버튼 대기 및 클릭 (id가 onetrust-accept-btn-handler인 경우가 많음)
+            accept_btn = page.locator("#onetrust-accept-btn-handler")
+            if accept_btn.is_visible():
+                accept_btn.click()
+                print("[Login] 쿠키 승인 완료")
+                time.sleep(3)
+        except:
+            print("[Login] 쿠키 배너가 없거나 이미 닫혀있음")
+
+        # 이메일/비번 입력
         page.fill("input[type='email']", EMAIL)
         page.fill("input[type='password']", PASSWORD)
-        page.click("button:has-text('Log in')")
-        time.sleep(7)
+        
+        # [중요] force=True를 추가하여 레이어가 가리고 있어도 강제로 클릭 시도
+        page.click("button:has-text('Log in')", force=True)
+        print("[Login] 로그인 버튼 클릭 완료")
+        
+        time.sleep(7) # 로그인 후 전환 대기
 
         for item in targets:
             uid, row_idx, name = item['uuid'], item['row'], item['name']
