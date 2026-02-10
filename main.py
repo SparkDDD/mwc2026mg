@@ -65,7 +65,7 @@ def main():
 
         for item in targets:
             uid, row_idx, name = item['uuid'], item['row'], item['name']
-            final_msg = f"Hi {name}!\n\n{RAW_MESSAGE}" if RAW_MESSAGE else f"Hi {name}!"
+            final_msg = f"Hi {name}! {RAW_MESSAGE}" if RAW_MESSAGE else f"Hi {name}! "
             
             print(f"\n[Target] {name} ({uid}) 작업 중...")
             
