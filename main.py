@@ -61,15 +61,29 @@ def main():
         print("[System] 로그인 페이지 접속 중...")
         page.goto("https://www.mwcbarcelona.com/mymwc", wait_until="domcontentloaded")
         
-        # 2. 쿠키 배너 제거 (로그인 버튼을 가릴 수 있음)
+        # 2. 쿠키 배너 집중 공략 (Accept All 버튼)
+        print("[System] 쿠키 배너 처리 중...")
         try:
-            accept_btn = page.locator("#onetrust-accept-btn-handler")
-            if accept_btn.is_visible(timeout=5000):
-                accept_btn.click(force=True) # 강제 클릭 옵션 사용
-                print("[System] 쿠키 배너 제거 완료")
-                time.sleep(2)
-        except:
-            pass
+            # ID 또는 텍스트로 버튼 찾기
+            accept_selector = "button#onetrust-accept-btn-handler, button:has-text('Accept All')"
+
+            # 버튼이 나타날 때까지 대기
+            page.wait_for_selector(accept_selector, timeout=10000)
+
+            # 강제 클릭 (다른 레이어가 가리고 있어도 클릭)
+            page.click(accept_selector, force=True)
+            print("[System] 쿠키 수락 완료")
+            time.sleep(2)
+        except Exception as e:
+            print("[System] 일반 클릭 실패 혹은 배너 미발생. 강제 제거 시도...")
+            # 클릭이 안 되면 JS로 배너 요소를 아예 삭제하여 로그인 버튼을 노출시킴
+            page.evaluate("""() => {
+                const banner = document.getElementById('onetrust-banner-sdk');
+                const overlay = document.querySelector('.onetrust-pc-dark-filter');
+                if (banner) banner.remove();
+                if (overlay) overlay.remove();
+            }""")
+            time.sleep(1)
 
         # 3. 로그인 정보 입력
         page.fill("input[type='email']", EMAIL)
@@ -88,28 +102,17 @@ def main():
             
             print(f"\n[Target] {name} ({uid}) 작업 중...")
             
+            
             try:
-                # 메시지 대화창으로 이동
-                page.goto(f"https://www.mwcbarcelona.com/mymwc/messaging?conversation={uid}", 
-                          wait_until="domcontentloaded")
-                
-                # 입력창 대기 (최대 30초)
+                page.goto(f"https://www.mwcbarcelona.com/mymwc/messaging?conversation={uid}", wait_until="domcontentloaded")
+
                 input_sel = "input[placeholder='Type a message...']"
-                page.wait_for_selector(input_sel, timeout=30000)
-                
-                # JavaScript를 통한 직접 값 주입 (안전성 확보)
-                page.evaluate("""([selector, text]) => {
-                    const input = document.querySelector(selector);
-                    if (input) {
-                        input.value = text;
-                        input.dispatchEvent(new Event('input', { bubbles: true }));
-                        input.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                }""", [input_sel, final_msg])
-                
-                time.sleep(1.5)
+                page.wait_for_selector(input_sel, timeout=20000)
+
+                # 기존 방식: 단순히 fill로 입력
+                page.fill(input_sel, final_msg)
                 page.keyboard.press("Enter")
-                
+                                     
                 # 결과 기록
                 now = time.strftime('%Y-%m-%d %H:%M:%S')
                 sheet.update(range_name=f"C{row_idx}:E{row_idx}", values=[["Success", now, "Sent Successfully"]])
@@ -121,7 +124,7 @@ def main():
                 sheet.update(range_name=f"C{row_idx}:E{row_idx}", values=[["Fail", time.strftime('%Y-%m-%d %H:%M:%S'), error_full[:50]]])
 
             # 스팸 방지 랜덤 대기
-            wait_time = round(random.uniform(20, 35), 1)
+            wait_time = round(random.uniform(15, 25), 1)
             print(f"[Wait] {wait_time}초 대기...")
             time.sleep(wait_time)
 
